@@ -7627,7 +7627,7 @@ static int __init vmx_init(void)
 	//!msr 읽어온다.
 	rdmsrl_safe(MSR_EFER, &host_efer);
 	//!64bit를 지원하면 index는 6
-	//!현재 cpu가 지워하는 feature를 적어둔다..
+	//!현재 cpu가 지원하는 feature를 적어둔다..
 	//!shared_msrs_global에는 현재 cpu의 feature가 저장되어있다.
 	for (i = 0; i < NR_VMX_MSR; ++i)
 		kvm_define_shared_msr(i, vmx_msr_index[i]);
