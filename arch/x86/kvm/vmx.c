@@ -2740,7 +2740,7 @@ static __init int alloc_kvm_area(void)
 
 	for_each_possible_cpu(cpu) {
 		struct vmcs *vmcs;
-
+		//! vmcs를 가용가능한pcpu별로 할당
 		vmcs = alloc_vmcs_cpu(cpu);
 		if (!vmcs) {
 			free_kvm_area();
@@ -2754,40 +2754,46 @@ static __init int alloc_kvm_area(void)
 
 static __init int hardware_setup(void)
 {
+  //! check later
+  //! vmcs_config setting - check later
+  //! pin-based control, processor-based control intel chapter 24.6
+  //! Appendix A.10 VPID AND EPT CAPABILITIES에서 vmx_capability.ept 확인
 	if (setup_vmcs_config(&vmcs_config) < 0)
 		return -EIO;
-
+	//! NX=excute disable 지원하는지 확인
+	//! 있으면? IA32_EFER.NXE enable해서 활성화Chapter 5.13
 	if (boot_cpu_has(X86_FEATURE_NX))
 		kvm_enable_efer_bits(EFER_NX);
-
+	//! vpid 지원 없으면 vpid flag off
 	if (!cpu_has_vmx_vpid())
 		enable_vpid = 0;
-
+	//! EPT가 지원되나 체크
+	//! 없으면 플래그 off
 	if (!cpu_has_vmx_ept() ||
-	    !cpu_has_vmx_ept_4levels()) {
+	    !cpu_has_vmx_ept_4levels()) {//! page walk length of 4?
 		enable_ept = 0;
 		enable_unrestricted_guest = 0;
 		enable_ept_ad_bits = 0;
 	}
-
+	//!accessed and dirty flag for EPT Chapter 28.2.4
 	if (!cpu_has_vmx_ept_ad_bits())
 		enable_ept_ad_bits = 0;
-
+	//!unrestricted guest Chapter 25.6
 	if (!cpu_has_vmx_unrestricted_guest())
 		enable_unrestricted_guest = 0;
-
+	//!tpr_shadow,&& virtualize_apic_address Chapter 29
 	if (!cpu_has_vmx_flexpriority())
 		flexpriority_enabled = 0;
 
 	if (!cpu_has_vmx_tpr_shadow())
 		kvm_x86_ops->update_cr8_intercept = NULL;
-
+	//!large page check
 	if (enable_ept && !cpu_has_vmx_ept_2m_page())
 		kvm_disable_largepages();
-
+	//! pause loop exiting check Chapter 24.6.13
 	if (!cpu_has_vmx_ple())
 		ple_gap = 0;
-
+	//! APIC-register virtualization, Virtual-interrupt delivery check
 	if (!cpu_has_vmx_apic_register_virt() ||
 				!cpu_has_vmx_virtual_intr_delivery())
 		enable_apicv_reg_vid = 0;
@@ -2796,10 +2802,11 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->update_cr8_intercept = NULL;
 	else
 		kvm_x86_ops->hwapic_irr_update = NULL;
-
+	//! nested라면? check later
 	if (nested)
 		nested_vmx_setup_ctls_msrs();
-
+	//! cpu 마다 vmcs할당하고 종료
+	//! 2013-06-01
 	return alloc_kvm_area();
 }
 
