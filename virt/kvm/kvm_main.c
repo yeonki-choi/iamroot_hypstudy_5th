@@ -2567,11 +2567,17 @@ static int hardware_enable_all(void)
 	return r;
 }
 
+/* This function reacts on two notifications, CPU_DYING, CPU_STARTING and disables or enables the virtualization on that cpu. */
 static int kvm_cpu_hotplug(struct notifier_block *notifier, unsigned long val,
 			   void *v)
 {
 	int cpu = (long)v;
 
+	
+	//! kvm_usage_cont integer 변수이며, 
+	//! hardware_enable_all 이 호출될 때마다 값이 증가하고,
+	//! hardware_disable_all_nolock 이 호출될 때마다 감소함.
+	//! 
 	if (!kvm_usage_count)
 		return NOTIFY_OK;
 
@@ -2939,13 +2945,28 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 		goto out_free_0a;
 
 	for_each_online_cpu(cpu) {
+
+		//! smp_call_function_single - Run a function on a specific CPU
+		//! 특정 cpu 에 대해 함수를 실행한다. 
+		//! 1번째는 cpu,
+		//! 2번째 파라미터는 실행할 함수, kvm_arch_check_processor_compat의
+		//! 함수에는 kvm_x86_ops->check_processor_compatibility를 리턴한다. 
+		//! 3번째는 리턴변수의 임시 포인터, 
+		//! 4번째는 값이 true면 다른 cpu의 함수가 끝날때까지 대기함.
+		//! 리턴값은 성공이면 0, 실패면 음수를 리턴하는데 out_free_1 로 이동함.     
 		smp_call_function_single(cpu,
 				kvm_arch_check_processor_compat,
 				&r, 1);
+
+		//! out_free_1에는 kvm_arch_hardware_unsetup(/arch/x86/kvm/x86.c) 를 호출하며
+		//! 이 안에는 kvm_x86_ops->hardware_unsetup()를 호출한다.
 		if (r < 0)
 			goto out_free_1;
+			
 	}
-
+	
+	//! cpu 의 이벤트 중 CPU_DYING, CPU_STARTING 에 대해 알람을 등록하고 
+	//! 해당 cpu에 대해서 가상화를 활성화/비활성화를 설정 (핵심은 kvm_cpu_hotplug)
 	r = register_cpu_notifier(&kvm_cpu_notifier);
 	if (r)
 		goto out_free_2;
