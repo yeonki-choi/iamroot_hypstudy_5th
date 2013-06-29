@@ -2970,18 +2970,26 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	r = register_cpu_notifier(&kvm_cpu_notifier);
 	if (r)
 		goto out_free_2;
+	
+	//! 부팅시에 호출할 함수를 등록함.
 	register_reboot_notifier(&kvm_reboot_notifier);
 
 	/* A kmem cache lets us meet the alignment requirements of fx_save. */
+	//! vpu_aling 은 kvm_init() 의 파라미터로 넘어온다.
+	//! __alignof__.. kvm_vcpu 구조체가 몇 바이트로 정렬되어 있는지를 리턴, 구조체의 크기와는 상관없음 
 	if (!vcpu_align)
 		vcpu_align = __alignof__(struct kvm_vcpu);
-	kvm_vcpu_cache = kmem_cache_create("kvm_vcpu", vcpu_size, vcpu_align,
-					   0, NULL);
+	
+	//! vcpu_size 크기 만큼 캐시를 생성한다. (/proc/slabinfo 에서 kvm_vcpu 식별자로 확인할 수 있음)
+	//! 성공시 캐시에 대한 포인터를 리턴한다. 
+	kvm_vcpu_cache = kmem_cache_create("kvm_vcpu", vcpu_size, vcpu_align, 0, NULL);
 	if (!kvm_vcpu_cache) {
 		r = -ENOMEM;
 		goto out_free_3;
 	}
 
+	//! slab 캐시를 생성함 (slab 은 아래를 참고하기 바람)
+	//! slab 도움사이트: http://blog.naver.com/PostView.nhn?blogId=et3569&logNo=130120527546
 	r = kvm_async_pf_init();
 	if (r)
 		goto out_free;
@@ -2989,13 +2997,17 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 	kvm_chardev_ops.owner = module;
 	kvm_vm_fops.owner = module;
 	kvm_vcpu_fops.owner = module;
-
+	
+	//! 기타 디바이스를 등록함. 
+	//! 기타 디바이스가 무엇인지는 나중에 생각
 	r = misc_register(&kvm_dev);
 	if (r) {
 		printk(KERN_ERR "kvm: misc device register failed\n");
 		goto out_unreg;
 	}
 
+	//! 시스템 코어 오퍼레이션(여기서는 suspend, resume) 을 등록함. 
+	//! kvm_syscore_ops: suspend & resume settings
 	register_syscore_ops(&kvm_syscore_ops);
 
 	kvm_preempt_ops.sched_in = kvm_sched_in;
